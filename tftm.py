@@ -79,6 +79,9 @@ class MainWindow(QMainWindow):
         self.button_substrate_material = QPushButton("Select Substrate Material")
         self.button_substrate_material.clicked.connect(self.get_substrate_material)
 
+        self.button_reflectance_save = QPushButton("Save Reflectance")
+        self.button_reflectance_save.clicked.connect(self.save_reflectance)
+
         self.calibration_plot = pg.PlotWidget()
         self.calibration_plot.setBackground(self.colour)
         self.calibration_plot.setTitle("Calibration Spectrum")
@@ -128,6 +131,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.button_dark_reference_selection, 0, 2)
         self.layout.addWidget(self.button_thin_film_material, 0, 4)
         self.layout.addWidget(self.button_substrate_material, 0, 5)
+        self.layout.addWidget(self.button_reflectance_save, 0, 6)
         self.layout.addWidget(self.reflectance_display, 1, 1, 1, 4)
         self.layout.addWidget(self.calibration_plot, 2, 0, 3, 3)
         self.layout.addWidget(self.raw_reflectance_plot, 2, 4, 3, 3)
@@ -220,6 +224,7 @@ class MainWindow(QMainWindow):
             self.draw_calculated_reflectance()
 
     def calc_fit(self):
+        logger.debug("Calculating fit")
         if analysis.can_calculate_thickness(self.data):
             logger.debug("Calculating thickness")
             self.data.fit = analysis.calculate_thickness(self.data)
@@ -229,20 +234,20 @@ class MainWindow(QMainWindow):
     def get_fit_slider_pos(self, val):
         self.data.thickness = val
         self.draw_calculated_reflectance()
-        self.thickness_display.setText(f"Thickness: {self.data.thickness} nm")
+        self.thickness_display.setText(f"Thickness: {self.data.thickness:0.0f} nm")
 
     def set_fit_slider_pos(self):
         self.thickness_slider_fit.setValue(self.data.thickness)
-        self.thickness_display.setText(f"Thickness: {self.data.thickness} nm")
+        self.thickness_display.setText(f"Thickness: {self.data.thickness:0.0f} nm")
 
     def get_theory_slider_pos(self, val):
         self.data.thickness_theoretical = val
-        self.thickness_theory_display.setText(f"Theoretical Model Thickness: {self.data.thickness_theoretical} nm")
+        self.thickness_theory_display.setText(f"Theoretical Model Thickness: {self.data.thickness_theoretical:0.0f} nm")
         self.draw_calculated_reflectance()
 
     def get_theory_amplitude_slider_pos(self, val):
         self.data.amplitude_theoretical = val
-        self.amplitude_theory_display.setText(f"Theoretical Model Amplitude: {self.data.amplitude_theoretical}")
+        self.amplitude_theory_display.setText(f"Theoretical Model Amplitude: {self.data.amplitude_theoretical:0.0f}")
         self.draw_calculated_reflectance()
 
     def draw_theoretical_fit(self):
@@ -253,6 +258,21 @@ class MainWindow(QMainWindow):
                                                     self.data.substrate_optical_properties.k,
                                                     self.data.thickness_theoretical, self.data.amplitude_theoretical)
         self.calc_reflectance_plot.plot(self.data.fit.wavelength, theo(self.data.fit.wavelength), pen=self.fit_pen)
+
+    def save_reflectance(self):
+        logger.debug("Saving reflectance")
+        fname = QFileDialog.getSaveFileName(filter="*.csv")[0]
+        if len(fname) > 1:
+            if self.data.calc_reflectance_spectrum is not None:
+                out = self.data.calc_reflectance_spectrum.transpose()
+                np.savetxt(fname, out, delimiter=',')
+                logger.debug(f"Reflectance saved to {fname}")
+
+            else:
+                logger.debug("No data available to save")
+        else:
+            logger.debug("Invalid filename")
+
 
 
 if __name__ == "__main__":
