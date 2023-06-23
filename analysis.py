@@ -57,7 +57,7 @@ class Fit:
         self.error = B_err
 
 
-def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, normalize=False):
+def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, normalize=False, limit_small_values=False):
     logger.debug("Loading a spectrum file")
     if fname == "":
         logger.info("No file selected")
@@ -105,7 +105,7 @@ def can_calculate_reflectance(data_container):
         logger.warning(f"Can't calculate reflectance, however two numpy arrays are loaded of shapes {cal_shape}, {refl_shape}")
 
 
-def calculate_reflectance(data_container):
+def calculate_reflectance(data_container, limit_small_values=False):
     logger.debug("Calculating reflectance")
     # Assumes array shapes have already been checked
 
@@ -117,6 +117,13 @@ def calculate_reflectance(data_container):
 
     calibration = data_container.calibration_spectrum[1]
     calibration = calibration / np.max(calibration)
+
+    # limit_small_values
+    if limit_small_values:
+        mask = reflected < common.SMALL_VALUE_THRESHOLD
+        mask = np.logical_or(mask, calibration < common.SMALL_VALUE_THRESHOLD)
+        reflected[mask] = 1
+        calibration[mask] = 1
 
     data[1] = reflected / calibration
 

@@ -13,6 +13,7 @@ import sys
 import logging
 import common
 import analysis
+import numpy as np
 
 
 logger = logging.getLogger("TFTM")
@@ -152,8 +153,9 @@ class MainWindow(QMainWindow):
         self.state.calibration_file_path = QFileDialog.getOpenFileName()[0]
         self.logger.info(f"Calibration file set to '{self.state.calibration_file_path}'")
         self.data.calibration_spectrum = analysis.load_spectrum(self.state.calibration_file_path,
-                                                                self.data.dark_reference_spectrum,
-                                                                common.SUBTRACT_DARK_FROM_CALIBRATION)
+                                                                dark_spectrum= self.data.dark_reference_spectrum,
+                                                                dark_subtraction_enabled= common.SUBTRACT_DARK_FROM_CALIBRATION,
+                                                                normalize=False)
         if self.data.calibration_spectrum is not None:
             self.logger.debug("Calibration loaded")
             self.calibration_plot.clear()
@@ -169,8 +171,9 @@ class MainWindow(QMainWindow):
         self.reflectance_display.setText(f"Reflectance file:{self.state.reflectance_file_path}")
         self.logger.info(f"Reflectance file set to '{self.state.reflectance_file_path}'")
         self.data.raw_reflectance_spectrum = analysis.load_spectrum(self.state.reflectance_file_path,
-                                                                    self.data.dark_reference_spectrum,
-                                                                    common.SUBTRACT_DARK_FROM_REFLECTED)
+                                                                    dark_spectrum=self.data.dark_reference_spectrum,
+                                                                    dark_subtraction_enabled=common.SUBTRACT_DARK_FROM_REFLECTED,
+                                                                    normalize=False)
         if self.data.raw_reflectance_spectrum is not None:
             self.logger.debug("Raw reflectance loaded")
             self.raw_reflectance_plot.clear()
@@ -193,7 +196,8 @@ class MainWindow(QMainWindow):
     def draw_calculated_reflectance(self):
         self.logger.debug("Drawing calculated reflectance")
         if analysis.can_calculate_reflectance(self.data):
-            self.data.calc_reflectance_spectrum = analysis.calculate_reflectance(self.data)
+            self.data.calc_reflectance_spectrum = analysis.calculate_reflectance(self.data,
+                                                                                 limit_small_values=common.SET_SMALL_VALUES_TO_1)
             if self.state.last_thickness_fit != self.data.thickness:
                 self.calc_fit()
                 self.state.last_thickness_fit = self.data.thickness
