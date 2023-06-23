@@ -105,7 +105,7 @@ def can_calculate_reflectance(data_container):
         logger.warning(f"Can't calculate reflectance, however two numpy arrays are loaded of shapes {cal_shape}, {refl_shape}")
 
 
-def calculate_reflectance(data_container, limit_small_values=False):
+def calculate_reflectance(data_container, limit_small_values=False, normalize_reflectance=True):
     logger.debug("Calculating reflectance")
     # Assumes array shapes have already been checked
 
@@ -113,10 +113,7 @@ def calculate_reflectance(data_container, limit_small_values=False):
     data[0] = data_container.calibration_spectrum[0]
 
     reflected = data_container.raw_reflectance_spectrum[1]
-    reflected = reflected / np.max(reflected)
-
     calibration = data_container.calibration_spectrum[1]
-    calibration = calibration / np.max(calibration)
 
     # limit_small_values
     if limit_small_values:
@@ -125,16 +122,16 @@ def calculate_reflectance(data_container, limit_small_values=False):
         reflected[mask] = 1
         calibration[mask] = 1
 
-    data[1] = reflected / calibration
+    reflectance = reflected / calibration
+
+    # normalize_reflectance
+    if normalize_reflectance:
+        reflectance = reflectance / np.max(reflectance)
+
+    data[1] = reflectance
 
     # Normalize so max is 1
     data[1] = data[1] / np.max(data[1])
-
-    # dx = data[0][1] - data[0][0]
-    # width = 300
-    # offset = signal.savgol_filter(data[1], int(width/dx), 3, mode="constant")
-    # data[1] = data[1] - offset
-
     return data
 
 
@@ -142,14 +139,14 @@ def load_optical_properties(fname):
     logger.debug(f"Loading optical properties for {fname}")
     data = np.loadtxt(fname, skiprows=common.OPTICAL_PROPS_SKIPLINES, delimiter=common.OPTICAL_PROPS_DELIMITER)
     data = data.transpose()
-    return OpticalProperties(data[0] * 1000, data[1], data[2])
+    return OpticalProperties(data[0] * 1000, data[1], data[2])  # 1000 is unit conversion
 
 
 efield_reflectance = lambda n1, n2: (n1 - n2) / (n1 + n2)
 efield_reflectance_complex = lambda n1, k1, n2, k2: ((n1 - 1j * k1) - (n2 - 1j * k2)) / ((n1 - 1j * k1) + (n2 - 1j * k2))
 
 
-def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A):
+def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B):
     """
     Based on equations 3.4, 3.10 and 3.6 in "A Practical Guide to Optical Metrology for Thin Films by Quinten
     """
@@ -166,16 +163,16 @@ def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A):
                      2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * d) * np.cos(
         (4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift)
 
-    return  A * refl_numerator / refl_denom
+    return A * refl_numerator / refl_denom + B
 
 
-def simple_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A):
+def simple_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B):
     r01 = efield_reflectance_complex(n_air, 0, n_tf(wavelengths), k_tf(wavelengths))
     r12 = efield_reflectance_complex(n_tf(wavelengths), k_tf(wavelengths), n_sub(wavelengths), k_sub(wavelengths))
     R01 = np.real(r01 * np.conj(r01))
     R12 = np.real(r12 * np.conj(r12))
     phase_shift = np.arctan(np.imag(np.conj(r01) * r12) / np.real(np.conj(r01) * r12))
-    return A * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift)
+    return A * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift) + B
 
 
 def calculate_thickness(data_container):
@@ -185,12 +182,12 @@ def calculate_thickness(data_container):
     lower = max((data_container.thin_film_optical_properties.lower,
                  data_container.substrate_optical_properties.lower,
                  data_container.calibration_spectrum[0][0],
-                 350))
+                 common.FIT_LOWER_BOUND_MINIMUM))
 
     upper = min((data_container.thin_film_optical_properties.upper,
                  data_container.substrate_optical_properties.upper,
                  data_container.calibration_spectrum[0][-1],
-                 800))
+                 common.FIT_UPPER_BOUND_MAXIMUM))
 
     logger.debug(f"Bounds are: {lower}, {upper}")
 
@@ -205,13 +202,13 @@ def calculate_thickness(data_container):
                                  data_container.thin_film_optical_properties.k,
                                  data_container.substrate_optical_properties.n,
                                  data_container.substrate_optical_properties.k,
-                                 B[0], B[1])
+                                 B[0], B[1], B[2])
 
     model = odr.Model(fit_model)
     fit_data = odr.RealData(data_container.calc_reflectance_spectrum[0][mask],
                             data_container.calc_reflectance_spectrum[1][mask]) # todo - No error at the moment
 
-    fit = odr.ODR(fit_data, model, beta0=[data_container.thickness, 1])
+    fit = odr.ODR(fit_data, model, beta0=[data_container.thickness, 1, 0])
     output = fit.run()
     output.pprint()
 

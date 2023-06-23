@@ -197,7 +197,8 @@ class MainWindow(QMainWindow):
         self.logger.debug("Drawing calculated reflectance")
         if analysis.can_calculate_reflectance(self.data):
             self.data.calc_reflectance_spectrum = analysis.calculate_reflectance(self.data,
-                                                                                 limit_small_values=common.SET_SMALL_VALUES_TO_1)
+                                                                                 limit_small_values=common.SET_SMALL_VALUES_TO_1,
+                                                                                 normalize_reflectance=True)
             if self.state.last_thickness_fit != self.data.thickness:
                 self.calc_fit()
                 self.state.last_thickness_fit = self.data.thickness
@@ -260,7 +261,7 @@ class MainWindow(QMainWindow):
                                                     self.data.thin_film_optical_properties.k,
                                                     self.data.substrate_optical_properties.n,
                                                     self.data.substrate_optical_properties.k,
-                                                    self.data.thickness_theoretical, self.data.amplitude_theoretical)
+                                                    self.data.thickness_theoretical, self.data.amplitude_theoretical, 0)
         self.calc_reflectance_plot.plot(self.data.fit.wavelength, theo(self.data.fit.wavelength), pen=self.fit_pen)
 
     def save_reflectance(self):
