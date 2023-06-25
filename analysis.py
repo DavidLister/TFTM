@@ -57,7 +57,7 @@ class Fit:
         self.error = B_err
 
 
-def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, normalize=False, limit_small_values=False):
+def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, normalize=False, calculate_flux=False):
     logger.debug("Loading a spectrum file")
     if fname == "":
         logger.info("No file selected")
@@ -65,6 +65,9 @@ def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, norm
     data = np.loadtxt(fname,
                       delimiter=common.SPECTRUM_FILE_DELIMITER,
                       skiprows=common.SPECTRUM_FILE_SKIPLINES)
+
+    with open(fname, 'r') as f:
+        header = [f.readline() for i in range(common.SPECTRUM_FILE_HEADER_LENGTH)]
 
     count = len(data[0][common.SPECTRUM_DATA_START_ROW:])
     data = data.transpose()
@@ -76,7 +79,12 @@ def load_spectrum(fname, dark_spectrum=None, dark_subtraction_enabled=True, norm
 
     # dark_subtraction
     if dark_spectrum is not None and dark_subtraction_enabled:
-        data_out[1] = np.abs(data_out[1] - dark_spectrum[1]) + 0.01  # Small value added for numerical instability
+        data_out[1] = data_out[1] - dark_spectrum[1]
+        data_out[1][data_out[1] < 1] = 1  # For numerical stability.
+
+    if calculate_flux:
+        exposure_time_us = header[common.SPECTRUM_FILE_EXPOSURE_INDEX].split(':')[1][1:].split('µ')[0]
+        data_out[1] = data_out[1] / (int(exposure_time_us) * 1e-6)  # Calculating flux in counts/second
 
     # Normalize the spectrum
     if normalize:

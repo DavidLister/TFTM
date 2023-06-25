@@ -118,6 +118,12 @@ class MainWindow(QMainWindow):
         self.amplitude_slider_theory.setValue(1)
         self.amplitude_slider_theory.valueChanged.connect(self.get_theory_amplitude_slider_pos)
 
+        self.offset_slider_theory = QSlider(QtCore.Qt.Horizontal)
+        self.offset_slider_theory.setMinimum(-2)
+        self.offset_slider_theory.setMaximum(2)
+        self.offset_slider_theory.setValue(0)
+        self.offset_slider_theory.valueChanged.connect(self.get_theory_amplitude_slider_pos)
+
         self.thickness_display = QLabel()
         self.thickness_display.setText(f"Fit Thickness: {self.data.thickness} nm")
 
@@ -155,7 +161,8 @@ class MainWindow(QMainWindow):
         self.data.calibration_spectrum = analysis.load_spectrum(self.state.calibration_file_path,
                                                                 dark_spectrum= self.data.dark_reference_spectrum,
                                                                 dark_subtraction_enabled= common.SUBTRACT_DARK_FROM_CALIBRATION,
-                                                                normalize=False)
+                                                                normalize=False,
+                                                                calculate_flux=common.USE_FLUX)
         if self.data.calibration_spectrum is not None:
             self.logger.debug("Calibration loaded")
             self.calibration_plot.clear()
@@ -173,7 +180,8 @@ class MainWindow(QMainWindow):
         self.data.raw_reflectance_spectrum = analysis.load_spectrum(self.state.reflectance_file_path,
                                                                     dark_spectrum=self.data.dark_reference_spectrum,
                                                                     dark_subtraction_enabled=common.SUBTRACT_DARK_FROM_REFLECTED,
-                                                                    normalize=False)
+                                                                    normalize=False,
+                                                                    calculate_flux=common.USE_FLUX)
         if self.data.raw_reflectance_spectrum is not None:
             self.logger.debug("Raw reflectance loaded")
             self.raw_reflectance_plot.clear()
@@ -198,7 +206,7 @@ class MainWindow(QMainWindow):
         if analysis.can_calculate_reflectance(self.data):
             self.data.calc_reflectance_spectrum = analysis.calculate_reflectance(self.data,
                                                                                  limit_small_values=common.SET_SMALL_VALUES_TO_1,
-                                                                                 normalize_reflectance=True)
+                                                                                 normalize_reflectance=common.NORMALIZE_REFLECTANCE)
             if self.state.last_thickness_fit != self.data.thickness:
                 self.calc_fit()
                 self.state.last_thickness_fit = self.data.thickness
