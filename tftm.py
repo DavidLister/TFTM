@@ -6,7 +6,7 @@
 #
 
 from PySide6 import QtGui, QtCore
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QGridLayout, QFileDialog, QSlider, QLabel
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QGridLayout, QFileDialog, QSlider, QLabel, QSizePolicy
 import pyqtgraph as pg
 import sys
 # Setup Logging
@@ -57,6 +57,9 @@ class MainWindow(QMainWindow):
         self.colour = self.palette().color(QtGui.QPalette.Window)
         self.main_pen = pg.mkPen(color=(20, 20, 20))
         self.fit_pen = pg.mkPen(color=(153, 0, 0))
+        self.header_font = QtGui.QFont("Fira Sans", 12)
+        self.body_font = QtGui.QFont("Fira Sans", 12)
+
 
         self.layout = QGridLayout()
 
@@ -109,29 +112,48 @@ class MainWindow(QMainWindow):
         self.thickness_slider_theory.setMinimum(1)
         self.thickness_slider_theory.setMaximum(3000)
         self.thickness_slider_theory.setValue(1000)
-        self.thickness_slider_theory.valueChanged.connect(self.get_theory_slider_pos)
+        self.thickness_slider_theory.valueChanged.connect(self.get_theory_thickness_slider_pos)
 
 
-        self.amplitude_slider_theory = QSlider(QtCore.Qt.Horizontal)
-        self.amplitude_slider_theory.setMinimum(0.1)
-        self.amplitude_slider_theory.setMaximum(100)
-        self.amplitude_slider_theory.setValue(1)
-        self.amplitude_slider_theory.valueChanged.connect(self.get_theory_amplitude_slider_pos)
+        self.n_modification_slider = QSlider(QtCore.Qt.Horizontal)
+        self.n_modification_slider.setMinimum(750)
+        self.n_modification_slider.setMaximum(1250)
+        self.n_modification_slider.setValue(1000)
+        self.n_modification_slider.valueChanged.connect(self.get_n_modification_slider_pos)
 
-        self.offset_slider_theory = QSlider(QtCore.Qt.Horizontal)
-        self.offset_slider_theory.setMinimum(-2)
-        self.offset_slider_theory.setMaximum(2)
-        self.offset_slider_theory.setValue(0)
-        self.offset_slider_theory.valueChanged.connect(self.get_theory_amplitude_slider_pos)
+        self.k_modification_slider = QSlider(QtCore.Qt.Horizontal)
+        self.k_modification_slider.setMinimum(0.1)
+        self.k_modification_slider.setMaximum(2000)
+        self.k_modification_slider.setValue(1000)
+        self.k_modification_slider.setTickInterval(0.1)
+        self.k_modification_slider.valueChanged.connect(self.get_k_modification_slider_slider_pos)
+
+        self.banner_fit_params = QLabel()
+        self.banner_fit_params.setText("Fit Parameters")
+        self.banner_fit_params.setFont(self.header_font)
+        self.banner_fit_params.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.thickness_display = QLabel()
         self.thickness_display.setText(f"Fit Thickness: {self.data.thickness} nm")
 
         self.thickness_theory_display = QLabel()
-        self.thickness_theory_display.setText(f"Theoretical Model Thickness: {self.data.thickness_theoretical} nm")
+        self.thickness_theory_display.setText(f"Theoretical Model Thickness: {self.data.thickness_theoretical:0.0f} nm")
 
-        self.amplitude_theory_display = QLabel()
-        self.amplitude_theory_display.setText(f"Theoretical Model Amplitude: {self.data.amplitude_theoretical}")
+        self.spacing_line = QWidget()
+        self.spacing_line.setFixedHeight(4)
+        self.spacing_line.setSizePolicy(QSizePolicy.Policy.Expanding)
+        self.spacing_line.setStyleSheet(QtCore.QStringEncoder("background-color: #c0c0c0;"))
+
+        self.banner_fit_modification = QLabel()
+        self.banner_fit_modification.setText("Thin film optical property modification")
+        self.banner_fit_modification.setFont(self.header_font)
+        self.banner_fit_modification.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.n_modification_display = QLabel()
+        self.n_modification_display.setText(f"Refractive index adjustment")
+
+        self.k_modification_display = QLabel()
+        self.k_modification_display.setText(f"Extinction coefficient adjustment")
 
         self.layout.addWidget(self.button_calibration_selection, 0, 0)
         self.layout.addWidget(self.button_reflectance_selection, 0, 1)
@@ -143,12 +165,17 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.calibration_plot, 2, 0, 3, 3)
         self.layout.addWidget(self.raw_reflectance_plot, 2, 4, 3, 3)
         self.layout.addWidget(self.calc_reflectance_plot, 7, 0, 5, 7)
-        self.layout.addWidget(self.thickness_slider_fit, 15, 0, 1, 7)
-        self.layout.addWidget(self.thickness_display, 16, 3)
-        self.layout.addWidget(self.thickness_slider_theory, 17, 0, 1, 7)
-        self.layout.addWidget(self.thickness_theory_display, 18, 3)
-        self.layout.addWidget(self.amplitude_slider_theory, 19, 0, 1, 7)
-        self.layout.addWidget(self.amplitude_theory_display, 20, 3)
+        self.layout.addWidget(self.spacing_line, 15,0, 1, 7)
+        self.layout.addWidget(self.banner_fit_params, 16, 3)
+        self.layout.addWidget(self.thickness_slider_fit, 17, 0, 1, 7)
+        self.layout.addWidget(self.thickness_display, 18, 3)
+        self.layout.addWidget(self.thickness_slider_theory, 19, 0, 1, 7)
+        self.layout.addWidget(self.thickness_theory_display, 20, 3)
+        self.layout.addWidget(self.banner_fit_modification, 21, 3)
+        self.layout.addWidget(self.n_modification_slider, 22, 0, 1, 3)
+        self.layout.addWidget(self.k_modification_slider, 22, 4, 1, 3)
+        self.layout.addWidget(self.n_modification_display, 23, 1)
+        self.layout.addWidget(self.k_modification_display, 23, 5)
 
         self.widget = QWidget()
         self.widget.setLayout(self.layout)
@@ -253,15 +280,39 @@ class MainWindow(QMainWindow):
         self.thickness_slider_fit.setValue(self.data.thickness)
         self.thickness_display.setText(f"Thickness: {self.data.thickness:0.0f} nm")
 
-    def get_theory_slider_pos(self, val):
+    def get_theory_thickness_slider_pos(self, val):
         self.data.thickness_theoretical = val
         self.thickness_theory_display.setText(f"Theoretical Model Thickness: {self.data.thickness_theoretical:0.0f} nm")
         self.draw_calculated_reflectance()
 
-    def get_theory_amplitude_slider_pos(self, val):
-        self.data.amplitude_theoretical = val
-        self.amplitude_theory_display.setText(f"Theoretical Model Amplitude: {self.data.amplitude_theoretical:0.0f}")
-        self.draw_calculated_reflectance()
+    def get_n_modification_slider_pos(self, val):
+        if analysis.can_calculate_reflectance(self.data):
+            self.data.n_modification = val / 1000.0
+            lower, upper = analysis.calculate_bounds(self.data)
+            mask = (upper > self.data.calibration_spectrum[0]) * (self.data.calibration_spectrum[0] > lower)
+            wavelengths = self.data.calc_reflectance_spectrum[0][mask]
+            n_avg = np.mean(self.data.thin_film_optical_properties.n(wavelengths))
+
+            self.n_modification_display.setText(
+                f"Average refractive index: {n_avg * self.data.n_modification:0.2f} (Modification factor of {self.data.n_modification:0.2f})")
+            self.draw_calculated_reflectance()
+
+        else:
+            pass
+
+    def get_k_modification_slider_slider_pos(self, val):
+        if analysis.can_calculate_reflectance(self.data):
+            self.data.k_modification = val / 1000.0
+            lower, upper = analysis.calculate_bounds(self.data)
+            mask = (upper > self.data.calibration_spectrum[0]) * (self.data.calibration_spectrum[0] > lower)
+            wavelengths = self.data.calc_reflectance_spectrum[0][mask]
+            k_avg = np.mean(self.data.thin_film_optical_properties.k(wavelengths))
+
+            self.k_modification_display.setText(f"Average extinction coefficient: {k_avg * self.data.k_modification:0.2f} (Modification factor of {self.data.k_modification:0.2f})")
+            self.draw_calculated_reflectance()
+
+        else:
+            pass
 
     def draw_theoretical_fit(self):
         theo = lambda x: analysis.reflectance_model(x, 1,
@@ -269,7 +320,9 @@ class MainWindow(QMainWindow):
                                                     self.data.thin_film_optical_properties.k,
                                                     self.data.substrate_optical_properties.n,
                                                     self.data.substrate_optical_properties.k,
-                                                    self.data.thickness_theoretical, self.data.amplitude_theoretical, 0)
+                                                    self.data.thickness_theoretical, 1, 0,
+                                                    n_factor=self.data.n_modification,
+                                                    k_factor=self.data.k_modification)
         self.calc_reflectance_plot.plot(self.data.fit.wavelength, theo(self.data.fit.wavelength), pen=self.fit_pen)
 
     def save_reflectance(self):
