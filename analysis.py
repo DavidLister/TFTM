@@ -115,7 +115,7 @@ def can_calculate_reflectance(data_container):
         logger.warning(f"Can't calculate reflectance, however two numpy arrays are loaded of shapes {cal_shape}, {refl_shape}")
 
 
-def calculate_reflectance(data_container, limit_small_values=False, normalize_reflectance=True):
+def calculate_reflectance(data_container, limit_small_values=False, normalize_reflectance=False, limit_to_peaks_in_bounds=False):
     logger.debug("Calculating reflectance")
     # Assumes array shapes have already been checked
 
@@ -134,14 +134,22 @@ def calculate_reflectance(data_container, limit_small_values=False, normalize_re
 
     reflectance = reflected / calibration
 
+    if limit_to_peaks_in_bounds:
+        lower, upper = calculate_bounds(data_container)
+        mask = (upper > data_container.calibration_spectrum[0]) * (data_container.calibration_spectrum[0] > lower)
+        max_in_bounds = np.max(reflectance[mask])
+        min_in_bounds = np.min(reflectance[mask])
+        reflectance[reflectance > max_in_bounds] = max_in_bounds
+        reflectance[reflectance < min_in_bounds] = min_in_bounds
+
     # normalize_reflectance
     if normalize_reflectance:
         reflectance = reflectance / np.max(reflectance)
 
     data[1] = reflectance
 
-    # Normalize so max is 1
-    data[1] = data[1] / np.max(data[1])
+    # # Normalize so max is 1
+    # data[1] = data[1] / np.max(data[1])
     return data
 
 
@@ -218,7 +226,9 @@ def calculate_thickness(data_container):
                                  data_container.thin_film_optical_properties.k,
                                  data_container.substrate_optical_properties.n,
                                  data_container.substrate_optical_properties.k,
-                                 B[0], B[1], B[2])
+                                 B[0], B[1], B[2],
+                                 n_factor=data_container.n_modification,
+                                 k_factor=data_container.k_modification )
 
     model = odr.Model(fit_model)
     fit_data = odr.RealData(data_container.calc_reflectance_spectrum[0][mask],

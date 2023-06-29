@@ -277,7 +277,8 @@ class MainWindow(QMainWindow):
         if analysis.can_calculate_reflectance(self.data):
             self.data.calc_reflectance_spectrum = analysis.calculate_reflectance(self.data,
                                                                                  limit_small_values=common.SET_SMALL_VALUES_TO_1,
-                                                                                 normalize_reflectance=common.NORMALIZE_REFLECTANCE)
+                                                                                 normalize_reflectance=common.NORMALIZE_REFLECTANCE,
+                                                                                 limit_to_peaks_in_bounds=common.LIMIT_TAILS_TO_PEAKS_IN_BOUNDS)
             # if self.state.last_thickness_fit != self.data.slider_thickness:
             #     self.calc_fit()
             #     self.state.last_thickness_fit = self.data.slider_thickness
