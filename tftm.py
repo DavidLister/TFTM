@@ -217,15 +217,17 @@ class MainWindow(QMainWindow):
 
     def get_calibration_file(self):
         self.logger.debug("Getting calibration file")
-        self.state.calibration_file_path = QFileDialog.getOpenFileName()[0]
-        self.logger.info(f"Calibration file set to '{self.state.calibration_file_path}'")
-        self.data.calibration_spectrum = analysis.load_spectrum(self.state.calibration_file_path,
-                                                                dark_spectrum= self.data.dark_reference_spectrum,
-                                                                dark_subtraction_enabled= common.SUBTRACT_DARK_FROM_CALIBRATION,
-                                                                normalize=False,
-                                                                calculate_flux=common.USE_FLUX)
-        if self.data.calibration_spectrum is not None:
+        test_path = QFileDialog.getOpenFileName()[0]
+        test_file = analysis.load_spectrum(test_path,
+                                           dark_spectrum= self.data.dark_reference_spectrum,
+                                           dark_subtraction_enabled= common.SUBTRACT_DARK_FROM_CALIBRATION,
+                                           normalize=False,
+                                           calculate_flux=common.USE_FLUX)
+        if test_file is not None:
             self.logger.debug("Calibration loaded")
+            self.data.calibration_spectrum = test_file
+            self.state.calibration_file_path = test_path
+            self.logger.info(f"Calibration file set to '{self.state.calibration_file_path}'")
             self.calibration_plot.clear()
             self.calibration_plot.plot(self.data.calibration_spectrum[0], self.data.calibration_spectrum[1], pen=self.main_pen)
             self.draw_calculated_reflectance()
@@ -235,32 +237,40 @@ class MainWindow(QMainWindow):
 
     def get_reflectance_file(self):
         self.logger.debug("Getting reflectance spectrum file")
-        self.state.reflectance_file_path = QFileDialog.getOpenFileName()[0]
-        self.reflectance_display.setText(f"Reflectance file:{self.state.reflectance_file_path}")
-        self.logger.info(f"Reflectance file set to '{self.state.reflectance_file_path}'")
-        self.data.raw_reflectance_spectrum = analysis.load_spectrum(self.state.reflectance_file_path,
-                                                                    dark_spectrum=self.data.dark_reference_spectrum,
-                                                                    dark_subtraction_enabled=common.SUBTRACT_DARK_FROM_REFLECTED,
-                                                                    normalize=False,
-                                                                    calculate_flux=common.USE_FLUX)
-        if self.data.raw_reflectance_spectrum is not None:
+        test_path = QFileDialog.getOpenFileName()[0]
+        self.reflectance_display.setText(f"Reflectance file:{test_path}")
+        test_file = analysis.load_spectrum(test_path,
+                                           dark_spectrum=self.data.dark_reference_spectrum,
+                                           dark_subtraction_enabled=common.SUBTRACT_DARK_FROM_REFLECTED,
+                                           normalize=False,
+                                           calculate_flux=common.USE_FLUX)
+        if test_file is not None:
             self.logger.debug("Raw reflectance loaded")
+            self.data.raw_reflectance_spectrum = test_file
+            self.state.reflectance_file_path = test_path
+            self.logger.info(f"Reflectance file set to '{self.state.reflectance_file_path}'")
             self.raw_reflectance_plot.clear()
             self.raw_reflectance_plot.plot(self.data.raw_reflectance_spectrum[0], self.data.raw_reflectance_spectrum[1], pen=self.main_pen)
             self.draw_calculated_reflectance()
 
         else:
-            logger.info("Error loading reflectance file")
+            logger.warning("Error loading reflectance file")
 
     def get_dark_reference_file(self):
         self.logger.debug("Getting dark reference spectrum file")
-        self.state.dark_reference_file_path = QFileDialog.getOpenFileName()[0]
-        self.logger.info(f"Dark reference file set to '{self.state.dark_reference_file_path}'")
-        self.data.dark_reference_spectrum = analysis.load_spectrum(self.state.dark_reference_file_path)
-        self.logger.debug("Dark reference loaded")
-        self.button_calibration_selection.setEnabled(True)
-        self.button_reflectance_selection.setEnabled(True)
-        self.draw_calculated_reflectance()
+        test_path = QFileDialog.getOpenFileName()[0]
+        test_file = analysis.load_spectrum(test_path)
+        if test_file is not None:
+            self.logger.debug("Dark reference loaded")
+            self.data.dark_reference_spectrum = test_file
+            self.state.dark_reference_file_path = test_path
+            self.logger.info(f"Dark reference file set to '{self.state.dark_reference_file_path}'")
+            self.button_calibration_selection.setEnabled(True)
+            self.button_reflectance_selection.setEnabled(True)
+            self.draw_calculated_reflectance()
+
+        else:
+            self.logger.warning("Error loading dark reference file")
 
     def draw_calculated_reflectance(self):
         self.logger.debug("Drawing calculated reflectance")
@@ -283,20 +293,26 @@ class MainWindow(QMainWindow):
 
     def get_thin_film_material(self):
         logger.debug("Loading thin film material properties")
-        self.state.thin_film_properties_path = QFileDialog.getOpenFileName()[0]
-        if self.state.thin_film_properties_path is not None:
+        test_path = QFileDialog.getOpenFileName()[0]
+        if test_path is not None and test_path != "":
+            self.state.thin_film_properties_path = test_path
             self.data.thin_film_optical_properties = analysis.load_optical_properties(self.state.thin_film_properties_path)
             logger.debug(f"Loaded {self.state.thin_film_properties_path} as thin film")
             self.draw_calculated_reflectance()
 
+        else:
+            logger.info("Error: Didn't load thin film properties")
+
     def get_substrate_material(self):
         logger.debug("Loading substrate material properties")
-        self.state.substrate_properties_path = QFileDialog.getOpenFileName()[0]
-        if self.state.substrate_properties_path is not None:
+        test_path = QFileDialog.getOpenFileName()[0]
+        if test_path is not None and test_path != "":
+            self.state.substrate_properties_path = test_path
             self.data.substrate_optical_properties = analysis.load_optical_properties(self.state.substrate_properties_path)
             logger.debug(f"Loaded {self.state.substrate_properties_path} as substrate")
             self.draw_calculated_reflectance()
-
+        else:
+            logger.info("Error: Didn't load substrate properties")
     def calc_fit(self):
         logger.debug("Calculating fit")
         if analysis.can_calculate_thickness(self.data):
