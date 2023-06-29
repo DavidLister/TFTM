@@ -30,9 +30,11 @@ class DataContainer:
         self.thin_film_optical_properties = None
         self.substrate_optical_properties = None
         self.fit = None
-        self.thickness = 1000
-        self.thickness_theoretical = 1000
-        self.amplitude_theoretical = 1
+        self.slider_thickness = 1000
+        self.slider_amplitude = 1
+        self.slider_offset = 0
+        self.n_modification = 1
+        self.k_modification = 1
 
 
 class OpticalProperties:
@@ -154,22 +156,22 @@ efield_reflectance = lambda n1, n2: (n1 - n2) / (n1 + n2)
 efield_reflectance_complex = lambda n1, k1, n2, k2: ((n1 - 1j * k1) - (n2 - 1j * k2)) / ((n1 - 1j * k1) + (n2 - 1j * k2))
 
 
-def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B):
+def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B, n_factor=1, k_factor=1):
     """
     Based on equations 3.4, 3.10 and 3.6 in "A Practical Guide to Optical Metrology for Thin Films by Quinten
     """
-    r01 = efield_reflectance_complex(n_air, 0, n_tf(wavelengths), k_tf(wavelengths))
-    r12 = efield_reflectance_complex(n_tf(wavelengths), k_tf(wavelengths), n_sub(wavelengths), k_sub(wavelengths))
+    r01 = efield_reflectance_complex(n_air, 0, n_tf(wavelengths)*n_factor, k_tf(wavelengths) * k_factor)
+    r12 = efield_reflectance_complex(n_tf(wavelengths)*n_factor, k_tf(wavelengths) * k_factor, n_sub(wavelengths), k_sub(wavelengths))
     R01 = np.real(r01 * np.conj(r01))
     R12 = np.real(r12 * np.conj(r12))
     phase_shift = np.arctan(np.imag(np.conj(r01) * r12) / np.real(np.conj(r01) * r12))
 
-    refl_numerator = R01 + R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * d) + \
-                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * d) * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift)
+    refl_numerator = R01 + R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) + \
+                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * n_factor * d + phase_shift)
 
-    refl_denom = 1 + R01 * R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * d) + \
-                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * d) * np.cos(
-        (4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift)
+    refl_denom = 1 + R01 * R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) + \
+                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) * np.cos(
+        (4 * np.pi / wavelengths) * n_tf(wavelengths) * n_factor * d + phase_shift)
 
     return A * refl_numerator / refl_denom + B
 
@@ -183,10 +185,7 @@ def simple_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B):
     return A * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift) + B
 
 
-def calculate_thickness(data_container):
-    logger.debug("Calculating film thickness")
-    # assumes data has been checked
-
+def calculate_bounds(data_container):
     lower = max((data_container.thin_film_optical_properties.lower,
                  data_container.substrate_optical_properties.lower,
                  data_container.calibration_spectrum[0][0],
@@ -197,15 +196,24 @@ def calculate_thickness(data_container):
                  data_container.calibration_spectrum[0][-1],
                  common.FIT_UPPER_BOUND_MAXIMUM))
 
+    return lower, upper
+
+
+def calculate_thickness(data_container):
+    logger.debug("Calculating film thickness")
+    # assumes data has been checked
+
+    lower, upper = calculate_bounds(data_container)
+
     logger.debug(f"Bounds are: {lower}, {upper}")
 
-    mask = (upper > data_container.calibration_spectrum[0]) * (data_container.calibration_spectrum[0] > lower)
+    mask = (data_container.calibration_spectrum[0] < upper) * (data_container.calibration_spectrum[0] > lower)
 
     logger.debug(f"Min: {np.min(data_container.calibration_spectrum[0][mask])} -- Max: {np.max(data_container.calibration_spectrum[0][mask])}")
 
     def fit_model(B, x):
         """ B[0] is thickness, B[1] is scaling factor"""
-        return reflectance_model(x, 1,
+        return reflectance_model(x, common.N_AIR,
                                  data_container.thin_film_optical_properties.n,
                                  data_container.thin_film_optical_properties.k,
                                  data_container.substrate_optical_properties.n,
@@ -216,7 +224,9 @@ def calculate_thickness(data_container):
     fit_data = odr.RealData(data_container.calc_reflectance_spectrum[0][mask],
                             data_container.calc_reflectance_spectrum[1][mask]) # todo - No error at the moment
 
-    fit = odr.ODR(fit_data, model, beta0=[data_container.thickness, 1, 0])
+    fit = odr.ODR(fit_data, model, beta0=[data_container.slider_thickness,
+                                          data_container.slider_amplitude,
+                                          data_container.slider_offset])
     output = fit.run()
     output.pprint()
 
