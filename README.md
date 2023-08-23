@@ -1,7 +1,7 @@
 # TFTM
 Thin Film Thickness Measurement (TFTM) is a tool for analysing white light reflectance data to measure a thin film's thickness.
 
-![](Docs\tftm_clean.png)
+![](Docs/tftm_clean.png)
 
 ## Installation
 This tool uses several python packages that can be installed using pip. They are:
