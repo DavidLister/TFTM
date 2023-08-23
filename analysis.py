@@ -172,7 +172,9 @@ def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B, n_f
     r12 = efield_reflectance_complex(n_tf(wavelengths)*n_factor, k_tf(wavelengths) * k_factor, n_sub(wavelengths), k_sub(wavelengths))
     R01 = np.real(r01 * np.conj(r01))
     R12 = np.real(r12 * np.conj(r12))
-    phase_shift = np.arctan(np.imag(np.conj(r01) * r12) / np.real(np.conj(r01) * r12))
+    phase_shift = np.zeros(r01.shape)
+    mask = np.real(np.conj(r01) * r12) != 0
+    phase_shift[mask] = np.arctan(np.imag(np.conj(r01[mask]) * r12[mask]) / np.real(np.conj(r01[mask]) * r12[mask]))
 
     refl_numerator = R01 + R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) + \
                      2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * n_factor * d + phase_shift)
