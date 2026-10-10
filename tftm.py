@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
 
         self.thickness_slider_fit = QSlider(QtCore.Qt.Horizontal)
         self.thickness_slider_fit.setMinimum(1)
-        self.thickness_slider_fit.setMaximum(3000)
+        self.thickness_slider_fit.setMaximum(6000)
         self.thickness_slider_fit.setValue(1000)
         self.thickness_slider_fit.valueChanged.connect(self.get_fit_slider_pos)
 
