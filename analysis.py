@@ -166,33 +166,35 @@ efield_reflectance_complex = lambda n1, k1, n2, k2: ((n1 - 1j * k1) - (n2 - 1j *
 
 def reflectance_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B, n_factor=1, k_factor=1):
     """
-    Based on equations 3.4, 3.10 and 3.6 in "A Practical Guide to Optical Metrology for Thin Films by Quinten
+    Normal-incidence reflectance of a single film on a semi-infinite substrate (exact Airy sum):
+        r = (r01 + r12*P) / (1 + r01*r12*P),   P = exp(-2i * 2*pi*(n - ik)*d / lambda),   R = |r|^2
+    Uses the N = n - ik convention of efield_reflectance_complex. See e.g. "A Practical Guide to Optical
+    Metrology for Thin Films" by Quinten, ch. 3.
+
+    The complex form is used instead of the intensity form R01 + R12 + 2*sqrt(R01*R12)*cos(delta + phase):
+    the interface phase was taken with np.arctan(Im/Re), which returns 0 instead of pi whenever
+    Re(conj(r01)*r12) < 0. That happens whenever the film index is above the substrate index (e.g. GaN or ZnO on
+    sapphire), and swapped the fringe maxima and minima. The denominator also used the wrong phase for absorbing
+    films.
     """
-    r01 = efield_reflectance_complex(n_air, 0, n_tf(wavelengths)*n_factor, k_tf(wavelengths) * k_factor)
-    r12 = efield_reflectance_complex(n_tf(wavelengths)*n_factor, k_tf(wavelengths) * k_factor, n_sub(wavelengths), k_sub(wavelengths))
-    R01 = np.real(r01 * np.conj(r01))
-    R12 = np.real(r12 * np.conj(r12))
-    phase_shift = np.zeros(r01.shape)
-    mask = np.real(np.conj(r01) * r12) != 0
-    phase_shift[mask] = np.arctan(np.imag(np.conj(r01[mask]) * r12[mask]) / np.real(np.conj(r01[mask]) * r12[mask]))
+    n_film = n_tf(wavelengths) * n_factor
+    k_film = k_tf(wavelengths) * k_factor
+    r01 = efield_reflectance_complex(n_air, 0, n_film, k_film)
+    r12 = efield_reflectance_complex(n_film, k_film, n_sub(wavelengths), k_sub(wavelengths))
 
-    refl_numerator = R01 + R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) + \
-                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * n_factor * d + phase_shift)
+    propagation = np.exp(-2j * (2 * np.pi / wavelengths) * (n_film - 1j * k_film) * d)
+    r = (r01 + r12 * propagation) / (1 + r01 * r12 * propagation)
 
-    refl_denom = 1 + R01 * R12 * np.exp(-(8 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) + \
-                     2 * np.sqrt(R01 * R12) * np.exp(-(4 * np.pi / wavelengths) * k_tf(wavelengths) * k_factor * d) * np.cos(
-        (4 * np.pi / wavelengths) * n_tf(wavelengths) * n_factor * d + phase_shift)
-
-    return A * refl_numerator / refl_denom + B
+    return A * np.abs(r) ** 2 + B
 
 
 def simple_model(wavelengths, n_air, n_tf, k_tf, n_sub, k_sub, d, A, B):
     r01 = efield_reflectance_complex(n_air, 0, n_tf(wavelengths), k_tf(wavelengths))
     r12 = efield_reflectance_complex(n_tf(wavelengths), k_tf(wavelengths), n_sub(wavelengths), k_sub(wavelengths))
-    R01 = np.real(r01 * np.conj(r01))
-    R12 = np.real(r12 * np.conj(r12))
-    phase_shift = np.arctan(np.imag(np.conj(r01) * r12) / np.real(np.conj(r01) * r12))
-    return A * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d + phase_shift) + B
+    # Two-beam approximation of reflectance_model: R ~ R01 + R12 + 2*Re(conj(r01)*r12*P), P = exp(-i*delta) for k = 0.
+    # np.angle keeps the full -pi..pi range (np.arctan(Im/Re) lost the pi phase when the film index is above the substrate's).
+    phase_shift = np.angle(np.conj(r01) * r12)
+    return A * np.cos((4 * np.pi / wavelengths) * n_tf(wavelengths) * d - phase_shift) + B
 
 
 def calculate_bounds(data_container):
